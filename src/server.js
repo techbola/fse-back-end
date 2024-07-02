@@ -70,36 +70,74 @@ app.get("/api/products/:productId", async (req, res) => {
 });
 
 // add user product to cart
-app.post("/api/users/:userId/cart", (req, res) => {
+app.post("/api/users/:userId/cart", async (req, res) => {
+  await client.connect();
+  const db = client.db("fse-vue");
+
+  const { userId } = req.params;
   const { productId } = req.body;
-  const product = products.find((product) => product.id === productId);
+
+  const product = await db.collection("products").findOne({ id: productId });
 
   if (!product) {
     res.status(404).json({ message: "Product not found" });
     return;
   }
 
-  cartItems.push(product);
-  res.status(200).json({ message: "Product added to cart" });
+  await db.collection("users").updateOne(
+    { id: userId },
+    {
+      $addToSet: {
+        cartItems: productId,
+      },
+    }
+  );
+
+  const user = await db.collection("users").findOne({ id: userId });
+  const cartItemsIds = user.cartItems;
+  const products = await db.collection("products").find({}).toArray();
+
+  const cartItems = cartItemsIds.map((id) => {
+    return products.find((product) => product.id === id);
+  });
+
+  res.status(200).json(cartItems);
+  client.close();
 });
 
 // delete user product from cart
-app.delete("/api/users/:userId/cart/:productId", (req, res) => {
-  const product = products.find(
-    (product) => product.id === req.params.productId
-  );
+app.delete("/api/users/:userId/cart/:productId", async (req, res) => {
+  await client.connect();
+  const db = client.db("fse-vue");
+
+  const { userId, productId } = req.params;
+
+  const product = await db.collection("products").findOne({ id: productId });
 
   if (!product) {
     res.status(404).json({ message: "Product not found" });
     return;
   }
 
-  const index = cartItems.indexOf(product);
-  if (index > -1) {
-    cartItems.splice(index, 1);
-  }
+  await db.collection("users").updateOne(
+    { id: userId },
+    {
+      $pull: {
+        cartItems: productId,
+      },
+    }
+  );
 
-  res.status(200).json({ message: "Product removed from cart" });
+  const user = await db.collection("users").findOne({ id: userId });
+  const cartItemsIds = user.cartItems;
+  const products = await db.collection("products").find({}).toArray();
+
+  const cartItems = cartItemsIds.map((id) => {
+    return products.find((product) => product.id === id);
+  });
+
+  res.status(200).json(cartItems);
+  client.close();
 });
 
 app.listen(8000, () => {
