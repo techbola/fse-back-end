@@ -1,6 +1,8 @@
 import express from "express";
 import bodyParser from "body-parser";
 import "dotenv/config";
+import path from "path";
+
 import { MongoClient } from "mongodb";
 
 const url = process.env.MONGO_DB_URL;
@@ -8,6 +10,8 @@ const client = new MongoClient(url);
 
 const app = express();
 app.use(bodyParser.json());
+
+app.use("/images", express.static(path.join(__dirname, "../assets")));
 
 // get all products
 app.get("/api/products", async (req, res) => {
